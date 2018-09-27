@@ -322,4 +322,4 @@ class WineList:
             [match_dict[column_name].append(token) for column_name in lookup_columns if self.is_in_column(token,column_name)]
             if self.is_in_vocab(token,model):
                 match_dict['description'].append(token)
-        return match_dict
+        return match_dict, desc
