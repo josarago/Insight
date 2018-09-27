@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import pickle
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
+from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 
 from collections import Counter
 import string
@@ -138,7 +139,6 @@ class StopWords:
         with open("{}.stop_words".format(self.category), 'wb') as fp:
             pickle.dump(self.set.difference(self.base_words), fp)
 
-
 # define the class cheese
 class WineList:
     """
@@ -159,7 +159,8 @@ class WineList:
         with open("wiki_wine_descriptors.txt","r") as f:
             for line in f:
                 self.descriptors.append(line.lower().strip('\n'))
-        self.doc2vec_model = None
+        self.tagged_data = None
+        self.tagged_data_set = None
 
     def clean_df(self,remove_outliers_percent=4):
         """
@@ -175,6 +176,19 @@ class WineList:
         if os.path.exists('winemag_cleaned.csv'):
             print("'winemag_cleaned.csv' already exists and will be overwritten")
         self.df.to_csv('winemag_cleaned.csv')
+
+    def get_tagged_data(self):
+            self.tagged_data = [TaggedDocument(words=self.tokenize(row.description), tags=[row.Index]) for row in self.df.itertuples()]
+            file_name = "tagged_data_set.pkl"
+            if os.path.exists(file_name):
+                print("loading " + file_name)
+                with open(file_name, 'rb') as f:
+                    self.tagged_data_set = pickle.load(f)
+            else:
+                self.tagged_data_set = dict(zip([x.tags[0] for x in tagged_data], [set(x.words) for x in tagged_data]))
+                print("saving " + file_name)
+                with open(file_name, 'wb') as f:
+                        pickle.dump(self.tagged_data_set, f, pickle.HIGHEST_PROTOCOL)
 
     def get_region_variety_stop_words(self,save=True):# to exclude region related words from description
         file_name = "regions_varieties.stop_words"
@@ -284,11 +298,10 @@ class WineList:
         returned_list.append(this_wine.description.values[0])
         return returned_list
 
-    def get_wines_from_desc(self,input_str,model,topn=100):
-        new_desc = self.tokenize(input_str,vocab=list(model.wv.vocab.keys()))
-        similar_docs = model.docvecs.most_similar([model.infer_vector(new_desc)],topn=topn)
+    def get_doc2vec_wines_from_desc(self,desc,model,topn=100):
+        similar_docs = model.docvecs.most_similar([model.infer_vector(desc)],topn=topn)
         indexes = [x[0] for x in similar_docs]
-        return indexes, new_desc
+        return indexes
 
     def is_in_column(self,token,column_name):
         """
@@ -323,3 +336,15 @@ class WineList:
             if self.is_in_vocab(token,model):
                 match_dict['description'].append(token)
         return match_dict, desc
+
+    def get_description_match_series_from_sets(self,desc):
+        set_desc = set(desc)
+        indexes = index=[x.tags[0] for x in self.tagged_data]
+        data=[set_desc.issubset(this_set) for this_set in self.tagged_data_set.values()]
+        return pd.Series(data=data,index=indexes)
+
+    def get_exact_match_from_description(self,input_str,model):
+        desc = self.tokenize(input_str,vocab=list(model.wv.vocab.keys()))
+        set_desc = set(desc)
+        indexes = [index for _, (index, this_desc) in enumerate(self.tagged_data_set.items()) if set_desc.issubset(this_desc)]
+        return indexes, desc
