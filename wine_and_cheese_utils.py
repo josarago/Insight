@@ -5,12 +5,12 @@ import requests
 from bs4 import BeautifulSoup
 import pickle
 from nltk.corpus import stopwords
-from nltk import word_tokenize
+from nltk.tokenize import RegexpTokenizer
+
 from collections import Counter
 import string
 
-
-
+regexp_tokenizer = RegexpTokenizer(r'\w+')
 
 split_columns = ['aroma','flavour','rind','texture','type','ingredients']
 
@@ -18,6 +18,9 @@ ingredients = ['pasteurized','unpasteurized','buffalo','camel','cow',
      'donkey','goat','mare','moose','buffalo','sheep','water buffalo',
      'reindeer','yak'
     ]
+
+df_columns = ['title','description','variety','region_1','country','price','points']
+
 
 # define the class cheese
 class RawCheese:
@@ -142,18 +145,60 @@ class WineList:
         Class used to deal with the wines
     """
     from sklearn.feature_extraction.text import TfidfVectorizer
-    def __init__(self,filename="winemag-data-130k-v2.csv"):
+    def __init__(self,file='original'):
+        if file=='original':
+            filename="winemag-data-130k-v2.csv"
+        elif file=='cleaned':
+            filename="winemag_cleaned.csv"
         self.df = pd.read_csv(filename, index_col=0)
         self.train_df = None
         self.tests_df = None
-        self.stop_words=StopWords('wine',file_path='wine.stop_words')
+        self.stop_words = StopWords('wine')
         self.variety_cnt = None
         self.descriptors = []
         with open("wiki_wine_descriptors.txt","r") as f:
             for line in f:
                 self.descriptors.append(line.lower().strip('\n'))
+        self.doc2vec_model = None
 
-    def tokenizer(self,sentence,use_stop='all',**kwargs):
+    def clean_df(self,remove_outliers_percent=4):
+        """
+            we're gonna use for sure the columns:'title','description','variety','region_1','country','price','points'
+            So let's just get rid of any row that has a nan in any of these
+        """
+        sub_df = self.df.filter(df_columns)
+        self.df = self.df[~sub_df.isna().any(axis=1)]
+        # remove description that are too long or too short
+        min_percentile = np.percentile(self.df.description.str.len().tolist(),remove_outliers_percent/2)
+        max_percentile = np.percentile(self.df.description.str.len().tolist(),100-remove_outliers_percent/2)
+        self.df = self.df[(min_percentile<self.df.description.str.len()) & (self.df.description.str.len()<max_percentile)]
+        if os.path.exists('winemag_cleaned.csv'):
+            print("'winemag_cleaned.csv' already exists and will be overwritten")
+        self.df.to_csv('winemag_cleaned.csv')
+
+    def get_region_variety_stop_words(self,save=True):# to exclude region related words from description
+        file_name = "regions_varieties.stop_words"
+        if not os.path.exists(file_name):
+            region_stop=[]
+            all_regions = list(set(self.df.region_1))
+            [region_stop.extend(self.tokenize(region,use_stop='base')) for region in all_regions]
+
+            # to exclude variety related words from description
+            variety_stop=[]
+            all_varieties = list(set(self.df.variety))
+            [variety_stop.extend(self.tokenize(variety,use_stop='base')) for variety in all_varieties]
+            print('done')
+            extra_stop = list(set(region_stop+variety_stop))
+            with open("regions_varieties.stop_words", 'wb') as fp:
+                    pickle.dump(extra_stop, fp)
+        else:
+            with open (file_name, 'rb') as fp:
+                extra_stop = pickle.load(fp)
+                print("loading regions and varities stop words from 'regions_varieties.stop_words'")
+        self.stop_words.set.update(extra_stop)
+        self.stop_words.save()
+
+    def tokenize(self,sentence,use_stop='all',**kwargs):
         vocab = kwargs.pop('vocab',None)
         if use_stop=='all':
             stop = self.stop_words.all
@@ -162,7 +207,7 @@ class WineList:
         extra_stop = kwargs.pop('extra_stop',None)
         if extra_stop:
             stop.union(extra_stop)
-        pretokenized = word_tokenize(sentence.lower())
+        pretokenized = regexp_tokenizer.tokenize(sentence.lower())
         if pretokenized:
             if vocab:
                 return [i for i in pretokenized if i in vocab and i not in stop]
@@ -238,3 +283,9 @@ class WineList:
         returned_list.append("Variety: {}  / Region: {} ".format(this_wine.variety.values[0],this_wine.region_1.values[0]))
         returned_list.append(this_wine.description.values[0])
         return returned_list
+
+    def get_wines_from_desc(self,input_str,model,topn=100):
+        new_desc = self.tokenize(input_str,vocab=list(model.wv.vocab.keys()))
+        similar_docs = model.docvecs.most_similar([model.infer_vector(new_desc)],topn=topn)
+        indexes = [x[0] for x in similar_docs]
+        return indexes, new_desc
