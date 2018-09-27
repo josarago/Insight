@@ -289,3 +289,37 @@ class WineList:
         similar_docs = model.docvecs.most_similar([model.infer_vector(new_desc)],topn=topn)
         indexes = [x[0] for x in similar_docs]
         return indexes, new_desc
+
+    def is_in_column(self,token,column_name):
+        """
+            fast way to check if an input string appears in a column
+        """
+        token = token.lower()
+        # lowered_column_str = [x.lower() for x in set(self.df[column_name])]
+        return any([token in this_column_str.lower() for this_column_str in set(self.df[column_name])])
+
+    def is_in_vocab(self,token,model):
+        return token.lower() in model.wv.vocab
+
+    def get_matched_columns(self,token,column_list):
+        """
+            find all the column in column list for which there is an exact match with
+        """
+        token = token.lower()
+        columns_matched = set()
+        [columns_matched.add(column_name) for column_name in column_list if self.is_in_column(token,column_name)]
+        return columns_matched
+
+    def get_match_dict(self,input_str,model):
+        lookup_columns = 'variety','region_1'
+        desc = self.tokenize(input_str)
+        match_dict = {
+                'description':[],
+                'variety':[],
+                'region_1':[],
+            }
+        for token in desc:
+            [match_dict[column_name].append(token) for column_name in lookup_columns if self.is_in_column(token,column_name)]
+            if self.is_in_vocab(token,model):
+                match_dict['description'].append(token)
+        return match_dict

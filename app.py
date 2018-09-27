@@ -3,6 +3,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 import pandas as pd
+import numpy as np
 from wine_and_cheese_utils import df_columns, WineList
 from gensim.models.doc2vec import Doc2Vec
 
@@ -29,17 +30,25 @@ app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"
 
 app.layout = html.Div(children=[
     html.H4(children='Cooler Wines'),
-    dcc.Slider(
-        id='my-slider',
-        min=5,
-        max=100,
-        step=1,
-        value=10,
-    ),
+    html.Div(
+            children=[
+                dcc.RangeSlider(
+                    marks={i: "${}".format(i) for i in np.linspace(0, 100, num=11)},
+                    id='price-range-slider',
+                    # count=1,
+                    min=0,
+                    max=100,
+                    step=5,
+                    value=[0, 100],
+                ),
+            ],
+            style={"width":"50%"},
+        ),
     html.Div(id='slider-output-container'),
     dcc.Input(
+            placeholder='type in wines or flavors..',
             id='input-text',
-            value='grapefruit mineral dry summer',
+            value='',
             type='text',
             style={'width': '100%','display': 'inline-block','fontColor': 'blue'},
         ),
@@ -50,9 +59,9 @@ app.layout = html.Div(children=[
 
 @app.callback(
     dash.dependencies.Output('slider-output-container', 'children'),
-    [dash.dependencies.Input('my-slider', 'value')])
+    [dash.dependencies.Input('price-range-slider', 'value')])
 def update_output(value):
-    return 'Max Price $"{}"'.format(value)
+    return 'Price range: $ {} - {}'.format(value[0],value[1])
 
 @app.callback(
     Output(component_id='results', component_property='children'),
@@ -70,7 +79,7 @@ def display(input_value):
             then present results from Doc2vec
     """
     # tokenize the input_value
-    
+
     # for each token
         # check if varieties or regions are present
 
@@ -87,13 +96,14 @@ def display(input_value):
             # if some exact matches are found display them
 
         # then display ML suggested options
-
+    if input_value=="":
+        return html.P("Describe the wine you are looking for"),
     try:
-        indexes, new_desc = wl.get_wines_from_desc(input_value,model,topn=50)
+        indexes, new_desc = wl.get_wines_from_desc(input_value,model,topn=20)
         # print(indexes)
         return html.Div(
             children=[
-                    html.P(",".join(new_desc)),
+                    html.P(",".join(new_desc)+"//"),
                     html.Table(
                         # Header
                         [html.Tr([html.Th(col) for col in disp_columns])] +
