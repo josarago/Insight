@@ -105,11 +105,6 @@ venv.bak/
 
 *.terminal
 
-*.pkl
-
-*.model
-
-*.stop_words
 
 /secrets/
 /work_in_progress/

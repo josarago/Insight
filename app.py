@@ -18,50 +18,42 @@ disp_columns = [
             'Price($)',
             'Score(/100)',
         ]
-# model = Doc2Vec.load('doc2vec_on_region_1_no_region_variety_full_dataset_working.model')
+
 model = Doc2Vec.load("doc2vec.model")
 wl.get_tagged_data()
 n_disp_max = 30
 
-app = dash.Dash()
+external_css = [
+        "//fonts.googleapis.com/css?family=Pacifico:400,300,600",
+        "//fonts.googleapis.com/css?family=Comfortaa:400,300,600",
+    ]
 
-# app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})
+app = dash.Dash(__name__)
 
-app.layout = html.Div(
-        children=[
-            # html.Div([
-            #     html.Img(src='/assets/vineyard_cropped.jpg')
-            #     ]),
-            html.H1(children='Speakeasy Wine'),
-            # html.Div(
-            #         children=[
-            #             dcc.RangeSlider(
-            #                 marks={i: "${}".format(i) for i in np.linspace(0, 100, num=11)},
-            #                 id='price-range-slider',
-            #                 # count=1,
-            #                 min=0,
-            #                 max=100,
-            #                 step=5,
-            #                 value=[0, 100],
-            #             ),
-            #         ],
-            #         style={"width":"50%"},
-            #     ),
-            # html.Div(id='slider-output-container'),
-            dcc.Input(
-                    placeholder='decribe the wine you are looking for',
-                    id='wine-search-bar',
-                    value='',
-                    type='text',
-                    style={
-                            'width': '100%',
-                            # 'display': 'inline-block',
-                        },
-                ),
-            html.Div(id='results'),
-            # generate_table(df),
-        ]
-    )
+# app.config['suppress_callback_exceptions']=True
+
+for css in external_css:
+    app.css.append_css({"external_url": css})
+
+app.layout = html.Div(children=[
+                html.Div(className='searchdiv',
+                        children=[
+                            html.H1(children='SpeakEasy Wine'),
+                            dcc.Input(
+                                    placeholder='Describe the wine you are looking for',
+                                    id='wine-search-bar',
+                                    value='',
+                                    type='text',
+                                    style={
+                                            'width': '100%',
+                                            # 'display': 'inline-block',
+                                        },
+                                    ),
+                            ]
+                        ),
+                html.Div(id='results'),
+                ]
+            )
 #
 # @app.callback(
 #     dash.dependencies.Output('slider-output-container', 'children'),
