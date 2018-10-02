@@ -30,7 +30,7 @@ external_css = [
         "//fonts.googleapis.com/css?family=Comfortaa:400,300,600",
     ]
 
-app = dash.Dash()
+app = dash.Dash(__name__)
 
 # app.config['suppress_callback_exceptions']=True
 
@@ -139,4 +139,4 @@ def display(input_value):
             )
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(host='0.0.0.0', debug=True)

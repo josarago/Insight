@@ -44,6 +44,7 @@
   box-sizing: border-box; }
 .searchdiv{
   background-image: url('super_cropped_vineyard.jpg');
+  background-repeat: no-repeat;
   width: 100%;
   /* height: auto; */
   /* padding: 50 px; */
