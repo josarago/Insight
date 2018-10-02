@@ -25,6 +25,8 @@ ingredients = ['pasteurized','unpasteurized','buffalo','camel','cow',
 
 df_columns = ['title','description','variety','region_1','country','price','points']
 
+warnings.filterwarnings("ignore")
+
 
 # define the class cheese
 class RawCheese:
