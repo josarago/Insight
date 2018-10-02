@@ -29,6 +29,9 @@ app = dash.Dash()
 
 app.layout = html.Div(
         children=[
+            # html.Div([
+            #     html.Img(src='/assets/vineyard_cropped.jpg')
+            #     ]),
             html.H1(children='Speakeasy Wine'),
             # html.Div(
             #         children=[
