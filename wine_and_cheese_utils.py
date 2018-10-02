@@ -376,7 +376,7 @@ class WineList:
         return returned_list
 
     def get_doc2vec_wines_from_desc(self,desc,topn=100):
-        similar_docs = wl.model.docvecs.most_similar([wl.model.infer_vector(desc)],topn=topn)
+        similar_docs = self.model.docvecs.most_similar([self.model.infer_vector(desc)],topn=topn)
         indexes = [x[0] for x in similar_docs]
         return indexes
 
