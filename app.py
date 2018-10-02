@@ -101,20 +101,31 @@ def display(input_value):
             ]
         else:
             exact_match_kid = [
-                html.P("We didn't find any exact match BUT!"),
+                html.P(
+                        style={'margin-top': '1%'},
+                        children="We didn't find any exact match BUT!"
+                    ),
             ]
         kids.extend(exact_match_kid)
         # some text to tell user this is NLP
         doc2vec_kid = [
-                html.P("Using the key words:"),
-                html.H4(format(" - ".join(desc))),
-                html.P("we found wines you might like"),
-                html.Table(
-                    [html.Tr([html.Th(col) for col in disp_columns])] +
-                    [html.Tr([
-                        html.Td(wl.df[wl.df.index==idx][col]) for col in df_columns
-                    ]) for idx in docs2vec_final_indexes[:15]]
-                ),
+                html.Div(
+                    style={ 'color': 'rgb(185, 25, 25)'},
+                    children = [
+                    html.P(
+                            style={'margin-top': '1%'},
+                            children="Using the key words:"
+                        ),
+                    html.H4(format(" - ".join(desc))),
+                    html.P("we found wines you might like"),
+                    html.Table(
+                        [html.Tr([html.Th(col) for col in disp_columns])] +
+                        [html.Tr([
+                            html.Td(wl.df[wl.df.index==idx][col]) for col in df_columns
+                        ]) for idx in docs2vec_final_indexes[:15]]
+                    ),
+                    ]
+                )
             ]
         kids.extend(doc2vec_kid)
 
