@@ -5,10 +5,9 @@ from dash.dependencies import Input, Output
 import pandas as pd
 import numpy as np
 from wine_and_cheese_utils import df_columns, WineList
-from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+# from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 
 # df = pd.read_csv("winemag-data-130k-v2.csv")
-wl = WineList(file='cleaned')
 disp_columns = [
             'Title                          ',
             'Description',
@@ -19,8 +18,11 @@ disp_columns = [
             'Score(/100)',
         ]
 
-model = Doc2Vec.load("doc2vec.model")
+wl = WineList(file='cleaned')
+# create and store the TaggedDocument list
 wl.get_tagged_data()
+# import (or retrain) the Doc2Vec model
+wl.get_doc2vec_model()
 n_disp_max = 30
 
 external_css = [
