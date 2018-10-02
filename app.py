@@ -30,7 +30,7 @@ external_css = [
         "//fonts.googleapis.com/css?family=Comfortaa:400,300,600",
     ]
 
-app = dash.Dash(__name__)
+app = dash.Dash()
 
 # app.config['suppress_callback_exceptions']=True
 
