@@ -4,6 +4,7 @@ import datetime
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
+import warnings
 import pickle
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
