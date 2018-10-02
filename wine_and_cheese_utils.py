@@ -375,8 +375,8 @@ class WineList:
         returned_list.append(this_wine.description.values[0])
         return returned_list
 
-    def get_doc2vec_wines_from_desc(self,desc,model,topn=100):
-        similar_docs = model.docvecs.most_similar([model.infer_vector(desc)],topn=topn)
+    def get_doc2vec_wines_from_desc(self,desc,topn=100):
+        similar_docs = wl.model.docvecs.most_similar([wl.model.infer_vector(desc)],topn=topn)
         indexes = [x[0] for x in similar_docs]
         return indexes
 
@@ -420,8 +420,8 @@ class WineList:
         data=[set_desc.issubset(this_set) for this_set in self.tagged_data_set.values()]
         return pd.Series(data=data,index=indexes)
 
-    def get_exact_match_from_description(self,input_str,model):
-        desc = self.tokenize(input_str,vocab=list(model.wv.vocab.keys()))
+    def get_exact_match_from_description(self,input_str):
+        desc = self.tokenize(input_str,vocab=list(self.model.wv.vocab.keys()))
         set_desc = set(desc)
         indexes = [index for _, (index, this_desc) in enumerate(self.tagged_data_set.items()) if set_desc.issubset(this_desc)]
         return indexes, desc

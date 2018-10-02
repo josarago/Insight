@@ -43,7 +43,7 @@
   padding: 0 20px;
   box-sizing: border-box; }
 .searchdiv{
-  background-image: url('super_cropped_vineyard.jpg');
+  background-image: url('vineyard_cropped.jpg');
   background-size: cover;
   /* background-size: contain; */
   background-repeat: no-repeat;
@@ -160,7 +160,7 @@ h1 {
   font-size: 5rem;
   line-height: 1.2;
   letter-spacing: -.1rem;
-  margin-left: 2rem;
+  margin-left: 2%;
   margin-bottom: 3rem;
   color: rgb(255, 255, 255);
   padding-top: 0.1rem;}

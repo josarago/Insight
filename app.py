@@ -5,7 +5,6 @@ from dash.dependencies import Input, Output
 import pandas as pd
 import numpy as np
 from wine_and_cheese_utils import df_columns, WineList
-# from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 
 # df = pd.read_csv("winemag-data-130k-v2.csv")
 disp_columns = [
@@ -31,7 +30,7 @@ external_css = [
     ]
 
 app = dash.Dash(__name__)
-
+app.title = "SpeakEasy Wine"
 # app.config['suppress_callback_exceptions']=True
 
 for css in external_css:
@@ -47,9 +46,10 @@ app.layout = html.Div(children=[
                                     value='',
                                     type='text',
                                     style={
-                                            'width': '90%',
-                                            'margin-left': '2rem',
-                                            'margin-right': '2rem'
+                                            'width': '96%',
+                                            'margin-left': '2%',
+                                            'margin-right': '2%',
+                                            'margin-bottom': '1%',
                                             # 'display': 'inline-block',
                                         },
                                     ),
@@ -81,30 +81,12 @@ def display(input_value):
             always start by presenting results that have exact matches,
             then present results from Doc2vec
     """
-    # tokenize the input_value
-
-    # for each token
-        # check if varieties or regions are present
-
-    # if there is more than one variety or one region
-        #throw some error
-
-    # if there is only one variety
-        # return message "so yeah we have n wines of this variety but that's boring. try .. instead"
-    # if there is only one region
-        # return message "so yeah we have n wines of this region but that's boring. try .. instead"
-
-    # if user enter keywords
-        # try to find exact results
-            # if some exact matches are found display them
-
-        # then display ML suggested options
     kids = []
     if input_value=="":
         kids.extend([html.P("Describe the wine you are looking for")])
     else:
-        exact_indexes, desc = wl.get_exact_match_from_description(input_value,wl.model)
-        docs2vec_indexes = wl.get_doc2vec_wines_from_desc(desc,wl.model,topn=20)
+        exact_indexes, desc = wl.get_exact_match_from_description(input_value)
+        docs2vec_indexes = wl.get_doc2vec_wines_from_desc(desc,topn=20)
         docs2vec_final_indexes = [idx for idx in docs2vec_indexes if idx not in exact_indexes]
         if len(exact_indexes)>0:
             exact_match_kid =[
