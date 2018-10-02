@@ -47,7 +47,9 @@ app.layout = html.Div(children=[
                                     value='',
                                     type='text',
                                     style={
-                                            'width': '100%',
+                                            'width': '90%',
+                                            'margin-left': '2rem',
+                                            'margin-right': '2rem'
                                             # 'display': 'inline-block',
                                         },
                                     ),

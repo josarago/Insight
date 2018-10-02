@@ -44,10 +44,13 @@
   box-sizing: border-box; }
 .searchdiv{
   background-image: url('super_cropped_vineyard.jpg');
+  background-size: cover;
+  /* background-size: contain; */
   background-repeat: no-repeat;
   width: 100%;
-  /* height: auto; */
-  /* padding: 50 px; */
+  /* height: 0; */
+  padding-top: 5%;
+  padding-bottom: 1%;
 }
 .column,
 .columns {
@@ -154,10 +157,11 @@ h1 {
   font-style: normal;
   font-variant: normal;
   font-weight: bold;
-  font-size: 4.5rem;
+  font-size: 5rem;
   line-height: 1.2;
   letter-spacing: -.1rem;
-  margin-bottom: 2rem;
+  margin-left: 2rem;
+  margin-bottom: 3rem;
   color: rgb(255, 255, 255);
   padding-top: 0.1rem;}
 h2 { font-size: 3.6rem; line-height: 1.25; letter-spacing: -.1rem; margin-bottom: 1.8rem; margin-top: 1.8rem;}
