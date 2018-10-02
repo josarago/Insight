@@ -101,8 +101,8 @@ def display(input_value):
     if input_value=="":
         kids.extend([html.P("Describe the wine you are looking for")])
     else:
-        exact_indexes, desc = wl.get_exact_match_from_description(input_value,model)
-        docs2vec_indexes = wl.get_doc2vec_wines_from_desc(desc,model,topn=20)
+        exact_indexes, desc = wl.get_exact_match_from_description(input_value,wl.model)
+        docs2vec_indexes = wl.get_doc2vec_wines_from_desc(desc,wl.model,topn=20)
         docs2vec_final_indexes = [idx for idx in docs2vec_indexes if idx not in exact_indexes]
         if len(exact_indexes)>0:
             exact_match_kid =[
