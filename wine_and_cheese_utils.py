@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import datetime
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
@@ -7,6 +8,8 @@ import pickle
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+from IPython.display import display, clear_output
+from scipy.spatial.distance import cosine
 
 from collections import Counter
 import string
@@ -135,8 +138,18 @@ class StopWords:
         with open (file_path, 'rb') as fp:
             self.set = pickle.load(fp)
 
-    def save(self):
-        with open("{}.stop_words".format(self.category), 'wb') as fp:
+    def get_date_suffix(self):
+        return datetime.datetime.now().strftime('%b_%d_%Y_%H-%M')
+
+    def save(self,overwrite=False):
+        filename =  "{}.stop_words".format(self.category)
+        if os.path.exists(filename):
+            if overwrite:
+                print("{} already exists and will be overwritten".format(filename))
+            else:
+                filename =  "{}_{}.stop_words".format(self.category,self.get_date_suffix())
+                print("file already exists, will be saved as {}".format(filename))
+        with open(filename, 'wb') as fp:
             pickle.dump(self.set.difference(self.base_words), fp)
 
 # define the class cheese
@@ -154,13 +167,16 @@ class WineList:
         self.train_df = None
         self.tests_df = None
         self.stop_words = StopWords('wine')
-        self.variety_cnt = None
+        self.column_cnt = dict.fromkeys(df_columns,None)
         self.descriptors = []
         with open("wiki_wine_descriptors.txt","r") as f:
             for line in f:
                 self.descriptors.append(line.lower().strip('\n'))
         self.tagged_data = None
         self.tagged_data_set = None
+
+    def get_date_suffix(self):
+        return datetime.datetime.now().strftime('%b_%d_%Y_%H-%M')
 
     def clean_df(self,remove_outliers_percent=4):
         """
@@ -177,20 +193,24 @@ class WineList:
             print("'winemag_cleaned.csv' already exists and will be overwritten")
         self.df.to_csv('winemag_cleaned.csv')
 
-    def get_tagged_data(self):
-            self.tagged_data = [TaggedDocument(words=self.tokenize(row.description), tags=[row.Index]) for row in self.df.itertuples()]
+    def get_tagged_data(self,recompute=False):
+            """get TaggedDocument either from file or from dataframe"""
             file_name = "tagged_data_set.pkl"
-            if os.path.exists(file_name):
+            self.tagged_data = [TaggedDocument(words=self.tokenize(row.description), tags=[row.Index]) for row in self.df.itertuples()]
+            if recompute or not os.path.exists(file_name):
+                self.tagged_data_set = dict(zip([x.tags[0] for x in self.tagged_data], [set(x.words) for x in self.tagged_data]))
+                print("saving " + file_name)
+                if os.path.exists(file_name):
+                    file_name = "tagged_data_set_{}.pkl".format(self.get_date_suffix())
+                    with open(file_name, 'wb') as f:
+                        pickle.dump(self.tagged_data_set, f, pickle.HIGHEST_PROTOCOL)
+            else:
                 print("loading " + file_name)
                 with open(file_name, 'rb') as f:
                     self.tagged_data_set = pickle.load(f)
-            else:
-                self.tagged_data_set = dict(zip([x.tags[0] for x in tagged_data], [set(x.words) for x in tagged_data]))
-                print("saving " + file_name)
-                with open(file_name, 'wb') as f:
-                        pickle.dump(self.tagged_data_set, f, pickle.HIGHEST_PROTOCOL)
 
-    def get_region_variety_stop_words(self,save=True):# to exclude region related words from description
+
+    def add_region_variety_stop_words(self,save=True,overwrite=False):# to exclude region related words from description
         file_name = "regions_varieties.stop_words"
         if not os.path.exists(file_name):
             region_stop=[]
@@ -207,10 +227,11 @@ class WineList:
                     pickle.dump(extra_stop, fp)
         else:
             with open (file_name, 'rb') as fp:
+                print("loading stop words from {}".format(file_name))
                 extra_stop = pickle.load(fp)
-                print("loading regions and varities stop words from 'regions_varieties.stop_words'")
         self.stop_words.set.update(extra_stop)
-        self.stop_words.save()
+        if save:
+            self.stop_words.save(overwrite=False)
 
     def tokenize(self,sentence,use_stop='all',**kwargs):
         vocab = kwargs.pop('vocab',None)
@@ -230,6 +251,46 @@ class WineList:
         else:
             return []
 
+    def get_doc2vec_model(
+            self,
+            retrain = False,
+            from_file="doc2vec.model",
+            max_epochs = 20,
+            vec_size = 40,
+            alpha = 0.025,
+            dalpha = -0.0002,
+            min_count=10,
+            dm =0,
+            dbow_words=1,
+        ):
+        # load or train the model
+        if retrain or not os.path.exists(from_file):
+            model_file_name = "doc2vec_{}.model".format(self.get_date_suffix())
+            self.model = Doc2Vec(
+                            vector_size=vec_size,
+                            alpha=alpha,
+                            min_count=min_count,
+                            dm =dm,
+                            dbow_words=dbow_words,
+                        )
+            if not self.tagged_data:
+                raise ValueError("use 'get_tagged_data' method to create or load TaggedDocument object")
+            self.model.build_vocab(self.tagged_data)
+            for epoch in range(max_epochs):
+                clear_output(wait=True)
+                display('iteration {0}'.format(epoch))
+                self.model.train(self.tagged_data,
+                            total_examples=self.model.corpus_count,
+                            epochs=self.model.epochs)
+                # decrease the learning rate
+                self.model.alpha+=dalpha
+                # fix the learning rate, no decay
+                self.model.min_alpha = self.model.alpha
+            self.model.save(model_file_name)
+        else:
+            print("loading Doc2Vec model from {}".format(from_file))
+            self.model = Doc2Vec.load(from_file)
+
     def split_df(self,df,train_frac):
         # split the data frame
         msk = np.random.rand(len(df)) < train_frac
@@ -237,13 +298,26 @@ class WineList:
         test_df = df[~msk]
         return train_df, test_df
 
-    def get_variety_cnt(self):
-        if self.variety_cnt==None:
-            self.variety_cnt = {variety:len(self.df[self.df.variety==variety]) for variety in list(set(self.df.variety))}
-            self.variety_cnt.pop(np.nan, None)
+    # def get_column_cnt(self,column_name):
+    #     if self.column_cnt[column_name]==None:
+    #         self.column_cnt[column_name] = {key:{len(self.df[self.df[column_name]==key])} for key in list(set(self.df[column_name]))}
+    #         self.column_cnt.pop(np.nan, None)
 
-    def top_varieties(self,n_min=500, exclude=['blend','portuguese']):
-        return {k:v for k,v in dict(self.variety_cnt).items() if v>n_min}
+    def get_column_cnt_list(self,column_name):
+        cnt = -1
+        self.column_cnt[column_name] = []
+        for key in list(set(self.df[column_name])):
+            self.column_cnt[column_name].append({'name':key,'count':len(self.df[self.df[column_name]==key])})
+
+    def get_top_keys(self,column_name,n_min=500):
+        if  not self.column_cnt[column_name]:
+            self.get_column_cnt_list(column_name)
+        return [x for x in self.column_cnt[column_name] if x['count']>=n_min]
+
+    # def get_top_keys(self,column_name,n_min=500):
+    #     if  not self.column_cnt[column_name]:
+    #         self.get_column_cnt(column_name)
+    #     return {k:v for k,v in dict(self.column_cnt[column_name]).items() if v>n_min}
 
     def cat_desc_by_var(self,df):
         print("only using the top {} varieties".format(len(self.top_varieties())))

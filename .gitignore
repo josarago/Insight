@@ -104,3 +104,12 @@ venv.bak/
 .mypy_cache/
 
 *.terminal
+
+*.pkl
+
+*.model
+
+*.stop_words
+
+/secrets/
+/work_in_progress/

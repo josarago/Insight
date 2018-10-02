@@ -18,7 +18,8 @@ disp_columns = [
             'Price($)',
             'Score(/100)',
         ]
-model = Doc2Vec.load('doc2vec_on_region_1_no_region_variety_full_dataset.model')
+# model = Doc2Vec.load('doc2vec_on_region_1_no_region_variety_full_dataset_working.model')
+model = Doc2Vec.load("doc2vec.model")
 wl.get_tagged_data()
 n_disp_max = 30
 
@@ -26,39 +27,44 @@ app = dash.Dash()
 
 # app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})
 
-app.layout = html.Div(children=[
-    html.H4(children='Cooler Wines'),
-    html.Div(
-            children=[
-                dcc.RangeSlider(
-                    marks={i: "${}".format(i) for i in np.linspace(0, 100, num=11)},
-                    id='price-range-slider',
-                    # count=1,
-                    min=0,
-                    max=100,
-                    step=5,
-                    value=[0, 100],
+app.layout = html.Div(
+        children=[
+            html.H1(children='Speakeasy Wine'),
+            # html.Div(
+            #         children=[
+            #             dcc.RangeSlider(
+            #                 marks={i: "${}".format(i) for i in np.linspace(0, 100, num=11)},
+            #                 id='price-range-slider',
+            #                 # count=1,
+            #                 min=0,
+            #                 max=100,
+            #                 step=5,
+            #                 value=[0, 100],
+            #             ),
+            #         ],
+            #         style={"width":"50%"},
+            #     ),
+            # html.Div(id='slider-output-container'),
+            dcc.Input(
+                    placeholder='decribe the wine you are looking for',
+                    id='wine-search-bar',
+                    value='',
+                    type='text',
+                    style={
+                            'width': '100%',
+                            # 'display': 'inline-block',
+                        },
                 ),
-            ],
-            style={"width":"50%"},
-        ),
-    html.Div(id='slider-output-container'),
-    dcc.Input(
-            placeholder='type in wines or flavors..',
-            id='wine-search-bar',
-            value='',
-            type='text',
-            style={'width': '100%','display': 'inline-block','fontColor': 'blue'},
-        ),
-    html.Div(id='results'),
-    # generate_table(df),
-])
-
-@app.callback(
-    dash.dependencies.Output('slider-output-container', 'children'),
-    [dash.dependencies.Input('price-range-slider', 'value')])
-def update_output(value):
-    return 'Price range: $ {} - {}'.format(value[0],value[1])
+            html.Div(id='results'),
+            # generate_table(df),
+        ]
+    )
+#
+# @app.callback(
+#     dash.dependencies.Output('slider-output-container', 'children'),
+#     [dash.dependencies.Input('price-range-slider', 'value')])
+# def update_output(value):
+#     return 'Price range: $ {} - {}'.format(value[0],value[1])
 
 @app.callback(
     Output(component_id='results', component_property='children'),
@@ -114,14 +120,14 @@ def display(input_value):
             ]
         else:
             exact_match_kid = [
-                html.H3("We didn't find any exact matches BUT!"),
+                html.P("We didn't find any exact match BUT!"),
             ]
         kids.extend(exact_match_kid)
         # some text to tell user this is NLP
         doc2vec_kid = [
                 html.P("Using the key words:"),
-                html.H3(format(" - ".join(desc))),
-                html.P("and Machine Learning, here are more suggestions"),
+                html.H4(format(" - ".join(desc))),
+                html.P("we found wines you might like"),
                 html.Table(
                     [html.Tr([html.Th(col) for col in disp_columns])] +
                     [html.Tr([
