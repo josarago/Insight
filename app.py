@@ -22,6 +22,7 @@ wl = WineList(file='cleaned')
 wl.get_tagged_data()
 # import (or retrain) the Doc2Vec model
 wl.get_doc2vec_model()
+n_exact_max = 10
 n_disp_max = 30
 
 external_css = [
@@ -31,6 +32,14 @@ external_css = [
 
 app = dash.Dash(__name__)
 app.title = "SpeakEasy Wine"
+
+def get_exact_match_str(n,n_exact_max):
+    if n==0:
+        return "We couldn't find any exact match"
+    elif n==1:
+        return "We found one exact match"
+    else:
+        return "We found {} exact matches. Here are {}".format(n,np.min(n,n_exact_max))
 # app.config['suppress_callback_exceptions']=True
 
 for css in external_css:
@@ -88,9 +97,10 @@ def display(input_value):
         exact_indexes, desc = wl.get_exact_match_from_description(input_value)
         docs2vec_indexes = wl.get_doc2vec_wines_from_desc(desc,topn=20)
         docs2vec_final_indexes = [idx for idx in docs2vec_indexes if idx not in exact_indexes]
+        exact_match_str = get_exact_match_str(len(exact_indexes),n_exact_max)
         if len(exact_indexes)>0:
             exact_match_kid =[
-                html.H3("We found {} exact matches:".format(len(exact_indexes))),
+                html.H3(exact_match_str),
                 # Header Table
                 html.Table(
                     [html.Tr([html.Th(col) for col in disp_columns])] +
@@ -103,7 +113,7 @@ def display(input_value):
             exact_match_kid = [
                 html.P(
                         style={'margin-top': '1%'},
-                        children="We didn't find any exact match BUT!"
+                        children=exact_match_str
                     ),
             ]
         kids.extend(exact_match_kid)
