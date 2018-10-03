@@ -11,6 +11,7 @@ from nltk.tokenize import RegexpTokenizer
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from IPython.display import display, clear_output
 from scipy.spatial.distance import cosine
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from collections import Counter
 import string
@@ -160,12 +161,13 @@ class WineList:
     """
         Class used to deal with the wines
     """
-    from sklearn.feature_extraction.text import TfidfVectorizer
     def __init__(self,file='original'):
         if file=='original':
             filename="winemag-data-130k-v2.csv"
         elif file=='cleaned':
             filename="winemag_cleaned.csv"
+        else:
+            raise ValueError("file can only be 'original' or 'cleaned'")
         self.df = pd.read_csv(filename, index_col=0)
         self.train_df = None
         self.tests_df = None
