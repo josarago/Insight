@@ -172,8 +172,8 @@ class WineList:
         self.train_df = None
         self.tests_df = None
         self.stop_words = StopWords('wine')
-        self.column_cnt = dict.fromkeys(df_columns,None)
         self.descriptors = []
+        self.column_cnt = dict.fromkeys(df_columns,None)
         with open("wiki_wine_descriptors.txt","r") as f:
             for line in f:
                 self.descriptors.append(line.lower().strip('\n'))
@@ -198,9 +198,9 @@ class WineList:
             print("'winemag_cleaned.csv' already exists and will be overwritten")
         self.df.to_csv('winemag_cleaned.csv')
 
-    def get_tagged_data(self,recompute=False):
+    def get_tagged_data(self,recompute=False,file_name = "tagged_data_set.pkl"):
             """get TaggedDocument either from file or from dataframe"""
-            file_name = "tagged_data_set.pkl"
+
             self.tagged_data = [TaggedDocument(words=self.tokenize(row.description), tags=[row.Index]) for row in self.df.itertuples()]
             if recompute or not os.path.exists(file_name):
                 self.tagged_data_set = dict(zip([x.tags[0] for x in self.tagged_data], [set(x.words) for x in self.tagged_data]))
@@ -395,7 +395,7 @@ class WineList:
 
     def get_matched_columns(self,token,column_list):
         """
-            find all the column in column list for which there is an exact match with
+            find all the column in column list for which there is an exact match with a token
         """
         token = token.lower()
         columns_matched = set()
@@ -422,8 +422,7 @@ class WineList:
         data=[set_desc.issubset(this_set) for this_set in self.tagged_data_set.values()]
         return pd.Series(data=data,index=indexes)
 
-    def get_exact_match_from_description(self,input_str):
-        desc = self.tokenize(input_str,vocab=list(self.model.wv.vocab.keys()))
+    def get_exact_match_from_description(self,desc):
         set_desc = set(desc)
         indexes = [index for _, (index, this_desc) in enumerate(self.tagged_data_set.items()) if set_desc.issubset(this_desc)]
-        return indexes, desc
+        return indexes
