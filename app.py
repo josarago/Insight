@@ -59,6 +59,7 @@ app.layout = html.Div(children=[
                             html.H1(children='SpeakEasy Wine'),
                             html.Div([
                                 dcc.Dropdown(
+                                    id='region-dropdown',
                                     options=REGION_OPTIONS,
                                     value="All Regions",
                                     style={
@@ -72,10 +73,11 @@ app.layout = html.Div(children=[
                                         id='wine-search-bar',
                                         value='',
                                         type='text',
-                                        # style={
-                                        #     'width': '100%',
-                                        #     # 'display': 'inline-block',
-                                        #     },
+                                        style={
+                                            'width': '100%',
+                                            'margin-left':'1%',
+                                            # 'display': 'inline-block',
+                                            },
                                         ),
                                     ],
                                     style={
@@ -98,10 +100,12 @@ app.layout = html.Div(children=[
 
 @app.callback(
     Output(component_id='results', component_property='children'),
-    [Input(component_id='wine-search-bar', component_property='value')]
+    [Input(component_id='wine-search-bar', component_property='value'),
+    Input(component_id='region-dropdown', component_property='value')
+    ]
 )
 
-def display(input_value):
+def display(input_value,region_name):
     """
         case 1:
         ------
