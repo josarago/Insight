@@ -1,3 +1,4 @@
+import pickle
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -25,6 +26,9 @@ wl.get_tagged_data()#file_name = "tagged_data_set_regions_varieties_removed.pkl"
 wl.get_doc2vec_model()#from_file="doc2vec_regions_varieties_removed.model") #  f"doc2vec_regions_varieties_removed.model")
 n_exact_max = 10
 n_disp_max = 30
+
+with open ("mean_region_docvecs_dict.pkl", 'rb') as fp:
+    MEAN_VECT_DICT =  pickle.load(fp)
 
 external_css = [
         "//fonts.googleapis.com/css?family=Pacifico:400,300,600",
