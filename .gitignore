@@ -105,6 +105,7 @@ venv.bak/
 
 *.terminal
 
+cheese_utils.py
 
 /secrets/
 /work_in_progress/

@@ -34,7 +34,7 @@ external_css = [
 app = dash.Dash(__name__)
 app.title = "SpeakEasy Wine"
 
-def get_exact_match_str(n,n_exact_max):
+def get_exact_match_str(n, n_exact_max):
     if n==0:
         return "We couldn't find any exact match"
     elif n==1:
@@ -136,7 +136,7 @@ def display(input_value):
                 html.Div(
                     style={ 'color': 'rgb(185, 25, 25)'},
                     children = [
-                    html.H3(style={'margin-top': '1%'},children="Our Machine Learnig algorithm found other wines you might like"),
+                    html.H3 (style={'margin-top': '1%'},children="Our Machine Learnig algorithm found other wines you might like"),
                     html.Table(
                         [html.Tr([html.Th(col) for col in disp_columns])] +
                         [html.Tr([

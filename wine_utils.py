@@ -6,6 +6,10 @@ import requests
 from bs4 import BeautifulSoup
 import warnings
 import pickle
+from collections import Counter
+import string
+warnings.filterwarnings("ignore")
+
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
@@ -13,108 +17,10 @@ from IPython.display import display, clear_output
 from scipy.spatial.distance import cosine
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from collections import Counter
-import string
+SPLIT_COLUMNS = ['aroma','flavour','rind','texture','type','ingredients']
 
-regexp_tokenizer = RegexpTokenizer(r'\w+')
+DF_COLUMNS = ['title','description','variety','region_1','country','price','points']
 
-split_columns = ['aroma','flavour','rind','texture','type','ingredients']
-
-ingredients = ['pasteurized','unpasteurized','buffalo','camel','cow',
-     'donkey','goat','mare','moose','buffalo','sheep','water buffalo',
-     'reindeer','yak'
-    ]
-
-df_columns = ['title','description','variety','region_1','country','price','points']
-
-warnings.filterwarnings("ignore")
-
-
-# define the class cheese
-class RawCheese:
-    """
-        given a cheese name (as extracted from the list on cheese.com)
-        one can access a dict of properties
-    """
-    def __init__(self,cheese_name):
-        self.url_name = cheese_name
-        self.cheese_com_url = 'https://www.cheese.com/{}/'.format(cheese_name)
-        self.dump = []
-        self.soup = None
-
-    def get_soup(self):
-        """
-        get the BeautifulSoup object from the cheese url on cheese.com
-        """
-        if not self.soup:
-            r = requests.get(self.cheese_com_url)
-            self.soup = BeautifulSoup(r.content, 'html.parser')
-
-    @property
-    def dict(self):
-        self.get_soup()
-        cheese_dict = {'name': self.url_name}
-        summary_points = self.soup.find_all("ul", {"class": "summary-points"})
-        features_list = [x.text for x in summary_points[0].find_all("p")]
-        for feature in features_list:
-            if ":" in feature:
-                split_feature = feature.split(":")
-                feature_key = split_feature[0].lower().replace(" ","_")
-                feature_val = split_feature[1].strip().lower()
-                cheese_dict[feature_key]=feature_val
-            elif "Made from" in feature:
-                feature_key = 'ingredients'
-                feature_val = feature.split("Made from")[1].lower()
-                cheese_dict[feature_key]=feature_val.strip()
-            else:
-                self.dump.append(feature)
-        return cheese_dict
-
-
-
-def get_cheeses_url_names(soup):
-    """
-        given a soup, extract all the cheeses url names present in the corresponding page
-    """
-    cheeses_url_names = []
-    cheeses_divs = soup.find_all("div", {"class": "col-sm-6 col-md-4 cheese-item text-center"})
-    for cheese_div in cheeses_divs:
-        cheeses_url_names.append(cheese_div.find("h3").findChild().attrs['href'].replace("/",""))
-    return cheeses_url_names
-
-def get_all_cheeses_url_names():
-    """
-        crawls cheese.com to extract all cheeses names
-    """
-    all_cheeses_url_names = set()
-    # Create alphabet list of lowercase letters
-    alphabet = []
-    for letter in range(97,123):
-        alphabet.append(chr(letter))
-    # for each letter in the alphabet
-    for letter in alphabet:
-        keep_going=True
-        n=0
-        print(letter)
-        while keep_going:
-            n+=1
-            letter_url = "https://www.cheese.com/alphabetical/?per_page=100&i={}&page={}#top".format(letter,n)
-            clear_output(wait=True)
-            display("getting letter {} page #{}".format(letter,n))
-            time.sleep(0.1)
-            r = requests.get(letter_url)
-            soup = BeautifulSoup(r.content,'html.parser')
-            page_cheeses_url_names = set(get_cheeses_url_names(soup))
-            diff = page_cheeses_url_names.difference(set(all_cheeses_url_names))
-            # if we request a page number that doesn't provide new cheeses, the site returns the
-            # same page as before, and we know we can go to the next letter
-            if not diff:
-                keep_going = False
-            else:
-                all_cheeses_url_names.update(diff)
-
-
-    return sorted(list(all_cheeses_url_names))
 
 class StopWords:
     def __init__(
@@ -156,7 +62,6 @@ class StopWords:
         with open(filename, 'wb') as fp:
             pickle.dump(self.set.difference(self.base_words), fp)
 
-# define the class cheese
 class WineList:
     """
         Class used to deal with the wines
@@ -173,35 +78,33 @@ class WineList:
         self.tests_df = None
         self.stop_words = StopWords('wine')
         self.descriptors = []
-        self.column_cnt = dict.fromkeys(df_columns,None)
+        self.column_cnt = dict.fromkeys(DF_COLUMNS,None)
         with open("wiki_wine_descriptors.txt","r") as f:
             for line in f:
                 self.descriptors.append(line.lower().strip('\n'))
         self.tagged_data = None
         self.tagged_data_set = None
 
-    def get_date_suffix(self):
-        return datetime.datetime.now().strftime('%b_%d_%Y_%H-%M')
-
-    def clean_df(self,remove_outliers_percent=4):
+    def clean_df(self,remove_outliers_percent=4,wine_csv_file='winemag_cleaned.csv'):
         """
             we're gonna use for sure the columns:'title','description','variety','region_1','country','price','points'
             So let's just get rid of any row that has a nan in any of these
         """
-        sub_df = self.df.filter(df_columns)
-        self.df = self.df[~sub_df.isna().any(axis=1)]
+        column_filtered_df = self.df.filter(DF_COLUMNS)
+        self.df = self.df[~column_filtered_df.isna().any(axis=1)]
+
         # remove description that are too long or too short
         min_percentile = np.percentile(self.df.description.str.len().tolist(),remove_outliers_percent/2)
         max_percentile = np.percentile(self.df.description.str.len().tolist(),100-remove_outliers_percent/2)
         self.df = self.df[(min_percentile<self.df.description.str.len()) & (self.df.description.str.len()<max_percentile)]
-        if os.path.exists('winemag_cleaned.csv'):
-            print("'winemag_cleaned.csv' already exists and will be overwritten")
-        self.df.to_csv('winemag_cleaned.csv')
+        if os.path.exists(wine_csv_file):
+            print("{} already exists and will be overwritten".format(wine_csv_file))
+        self.df.to_csv(wine_csv_file)
 
-    def get_tagged_data(self,recompute=False,file_name = "tagged_data_set.pkl"):
+    def get_tagged_data(self,recompute=False,file_name="tagged_data_set.pkl"):
             """get TaggedDocument either from file or from dataframe"""
+            self.tagged_data = [TaggedDocument(words=self.tokenize(row.description),tags=[row.Index]) for row in self.df.itertuples()]
 
-            self.tagged_data = [TaggedDocument(words=self.tokenize(row.description), tags=[row.Index]) for row in self.df.itertuples()]
             if recompute or not os.path.exists(file_name):
                 self.tagged_data_set = dict(zip([x.tags[0] for x in self.tagged_data], [set(x.words) for x in self.tagged_data]))
                 print("saving " + file_name)
@@ -239,6 +142,7 @@ class WineList:
             self.stop_words.save(overwrite=False)
 
     def tokenize(self,sentence,use_stop='all',**kwargs):
+        regexp_tokenizer = RegexpTokenizer(r'\w+')
         vocab = kwargs.pop('vocab',None)
         if use_stop=='all':
             stop = self.stop_words.all
@@ -426,3 +330,7 @@ class WineList:
         set_desc = set(desc)
         indexes = [index for _, (index, this_desc) in enumerate(self.tagged_data_set.items()) if set_desc.issubset(this_desc)]
         return indexes
+
+
+    def get_date_suffix(self):
+        return datetime.datetime.now().strftime('%b_%d_%Y_%H-%M')
