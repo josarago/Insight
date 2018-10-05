@@ -60,6 +60,7 @@ app.layout = html.Div(children=[
                             html.Div([
                                 dcc.Dropdown(
                                     options=REGION_OPTIONS,
+                                    # id='region-dropdown',
                                     value="All Regions",
                                     style={
                                         # 'display': 'inline-block',
@@ -98,10 +99,15 @@ app.layout = html.Div(children=[
 
 @app.callback(
     Output(component_id='results', component_property='children'),
-    [Input(component_id='wine-search-bar', component_property='value')]
+    [Input(component_id='wine-search-bar', component_property='value'),
+    # Input(component_id='region-dropdown', component_property='value')
+    ]
 )
 
-def display(input_value):
+def display(
+        search_input,
+        # region_name
+        ):
     """
         case 1:
         ------
@@ -130,10 +136,10 @@ def display(input_value):
 
     """
     kids = []
-    if input_value=="":
-        kids.extend([html.P("Describe the wine you are looking for")])
+    if search_input=="":
+        kids.extend([html.P("Describe the wine you are looking for {}".format(region_name))])
     else:
-        desc = wl.tokenize(input_value,vocab=list(wl.model.wv.vocab.keys()))
+        desc = wl.tokenize(search_input,vocab=list(wl.model.wv.vocab.keys()))
         print(" - ".join(desc))
         exact_indexes = wl.get_exact_match_from_description(desc)
         kids.extend([html.Div(
