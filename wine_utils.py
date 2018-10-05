@@ -10,6 +10,7 @@ from collections import Counter
 import string
 warnings.filterwarnings("ignore")
 
+import unidecode
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
@@ -74,6 +75,8 @@ class WineList:
         else:
             raise ValueError("file can only be 'original' or 'cleaned'")
         self.df = pd.read_csv(filename, index_col=0)
+        # move somewhere that makes more sense
+        self.df['region_decoded'] = self.df.region_1.apply(lambda x: unidecode.unidecode(x).lower())
         self.train_df = None
         self.tests_df = None
         self.stop_words = StopWords('wine')
@@ -85,7 +88,7 @@ class WineList:
         self.tagged_data = None
         self.tagged_data_set = None
 
-    def clean_df(self,remove_outliers_percent=4,wine_csv_file='winemag_cleaned.csv'):
+    def clean_df(self,remove_outliers_percent=4,to_wine_csv_file='winemag_cleaned.csv'):
         """
             we're gonna use for sure the columns:'title','description','variety','region_1','country','price','points'
             So let's just get rid of any row that has a nan in any of these
@@ -97,9 +100,28 @@ class WineList:
         min_percentile = np.percentile(self.df.description.str.len().tolist(),remove_outliers_percent/2)
         max_percentile = np.percentile(self.df.description.str.len().tolist(),100-remove_outliers_percent/2)
         self.df = self.df[(min_percentile<self.df.description.str.len()) & (self.df.description.str.len()<max_percentile)]
-        if os.path.exists(wine_csv_file):
+        if os.path.exists(to_wine_csv_file):
             print("{} already exists and will be overwritten".format(wine_csv_file))
-        self.df.to_csv(wine_csv_file)
+        self.df.to_csv(to_wine_csv_file)
+
+    def tokenize(self,sentence,use_stop='all',**kwargs):
+        regexp_tokenizer = RegexpTokenizer(r'\w+')
+        vocab = kwargs.pop('vocab',None)
+        if use_stop=='all':
+            stop = self.stop_words.all
+        elif use_stop=='base':
+            stop = self.stop_words.base
+        extra_stop = kwargs.pop('extra_stop',None)
+        if extra_stop:
+            stop.union(extra_stop)
+        pretokenized = regexp_tokenizer.tokenize(sentence.lower())
+        if pretokenized:
+            if vocab:
+                return [i for i in pretokenized if i in vocab and i not in stop]
+            else:
+                return [i for i in pretokenized if i not in stop]
+        else:
+            return []
 
     def get_tagged_data(self,recompute=False,file_name="tagged_data_set.pkl"):
             """get TaggedDocument either from file or from dataframe"""
@@ -140,25 +162,6 @@ class WineList:
         self.stop_words.set.update(extra_stop)
         if save:
             self.stop_words.save(overwrite=False)
-
-    def tokenize(self,sentence,use_stop='all',**kwargs):
-        regexp_tokenizer = RegexpTokenizer(r'\w+')
-        vocab = kwargs.pop('vocab',None)
-        if use_stop=='all':
-            stop = self.stop_words.all
-        elif use_stop=='base':
-            stop = self.stop_words.base
-        extra_stop = kwargs.pop('extra_stop',None)
-        if extra_stop:
-            stop.union(extra_stop)
-        pretokenized = regexp_tokenizer.tokenize(sentence.lower())
-        if pretokenized:
-            if vocab:
-                return [i for i in pretokenized if i in vocab and i not in stop]
-            else:
-                return [i for i in pretokenized if i not in stop]
-        else:
-            return []
 
     def get_doc2vec_model(
             self,
@@ -219,7 +222,7 @@ class WineList:
             self.column_cnt[column_name].append({'name':key,'count':len(self.df[self.df[column_name]==key])})
 
     def get_top_keys(self,column_name,n_min=500):
-        if  not self.column_cnt[column_name]:
+        if not self.column_cnt[column_name]:
             self.get_column_cnt_list(column_name)
         return [x for x in self.column_cnt[column_name] if x['count']>=n_min]
 
@@ -330,7 +333,6 @@ class WineList:
         set_desc = set(desc)
         indexes = [index for _, (index, this_desc) in enumerate(self.tagged_data_set.items()) if set_desc.issubset(this_desc)]
         return indexes
-
 
     def get_date_suffix(self):
         return datetime.datetime.now().strftime('%b_%d_%Y_%H-%M')
