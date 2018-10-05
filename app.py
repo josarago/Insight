@@ -4,10 +4,10 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 import pandas as pd
 import numpy as np
-from wine_and_cheese_utils import df_columns, WineList
+from wine_utils import DF_COLUMNS, WineList
 
 # df = pd.read_csv("winemag-data-130k-v2.csv")
-disp_columns = [
+DISP_COLUMNS = [
             'Title                          ',
             'Description',
             'Variety',
@@ -117,9 +117,9 @@ def display(input_value):
                 html.H3(exact_match_str),
                 # Header Table
                 html.Table(
-                    [html.Tr([html.Th(col) for col in disp_columns])] +
+                    [html.Tr([html.Th(col) for col in DISP_COLUMNS])] +
                     [html.Tr([
-                        html.Td(wl.df[wl.df.index==idx][col]) for col in df_columns
+                        html.Td(wl.df[wl.df.index==idx][col]) for col in DF_COLUMNS
                     ]) for idx in exact_indexes[:5]]
                     ),
             ]
@@ -138,9 +138,9 @@ def display(input_value):
                     children = [
                     html.H3 (style={'margin-top': '1%'},children="Our Machine Learnig algorithm found other wines you might like"),
                     html.Table(
-                        [html.Tr([html.Th(col) for col in disp_columns])] +
+                        [html.Tr([html.Th(col) for col in DISP_COLUMNS])] +
                         [html.Tr([
-                            html.Td(wl.df[wl.df.index==idx][col]) for col in df_columns
+                            html.Td(wl.df[wl.df.index==idx][col]) for col in DF_COLUMNS
                         ]) for idx in docs2vec_final_indexes[:15]]
                     ),
                     ]
