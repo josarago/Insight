@@ -24,11 +24,14 @@ wl = WineList(file='cleaned')
 wl.get_tagged_data()#file_name = "tagged_data_set_regions_varieties_removed.pkl") #"")  #
 # import (or retrain) the Doc2Vec model
 wl.get_doc2vec_model()#from_file="doc2vec_regions_varieties_removed.model") #  f"doc2vec_regions_varieties_removed.model")
-n_exact_max = 10
+n_exact_max = 5
 n_disp_max = 30
 
 with open ("mean_region_docvecs_dict.pkl", 'rb') as fp:
     MEAN_VECT_DICT =  pickle.load(fp)
+
+REGION_OPTIONS = [{'label': 'All Regions', 'value': 'All Regions'}]
+REGION_OPTIONS.extend([{'label': x, 'value': x} for x in MEAN_VECT_DICT.keys()])
 
 external_css = [
         "//fonts.googleapis.com/css?family=Pacifico:400,300,600",
@@ -54,19 +57,33 @@ app.layout = html.Div(children=[
                 html.Div(className='searchdiv',
                         children=[
                             html.H1(children='SpeakEasy Wine'),
-                            dcc.Input(
-                                    placeholder="Describe the wine you are looking for example 'fresh everyday dry wine with notes of citrus'",
-                                    id='wine-search-bar',
-                                    value='',
-                                    type='text',
+                            html.Div([
+                                dcc.Dropdown(
+                                    options=REGION_OPTIONS,
+                                    value="All Regions",
                                     style={
-                                            'width': '96%',
-                                            'margin-left': '2%',
-                                            'margin-right': '2%',
-                                            'margin-bottom': '1%',
-                                            # 'display': 'inline-block',
+                                        # 'display': 'inline-block',
+                                        'width': '65%',
                                         },
+                                    clearable=True
                                     ),
+                                dcc.Input(
+                                        placeholder="Describe the wine you are looking for. Example: 'fresh everyday dry wine with notes of citrus'",
+                                        id='wine-search-bar',
+                                        value='',
+                                        type='text',
+                                        # style={
+                                        #     'width': '100%',
+                                        #     # 'display': 'inline-block',
+                                        #     },
+                                        ),
+                                    ],
+                                    style={
+                                        'display': 'flex',
+                                        'margin-left':'2%',
+                                        'margin-right':'2%',
+                                        },
+                                )
                             ]
                         ),
                 html.Div(id='results'),
@@ -86,14 +103,31 @@ app.layout = html.Div(children=[
 
 def display(input_value):
     """
-        behavior:
-            user can enter:
-                - variety (will be shown wine of that variety)
-                - region (will be shown wine of that variety)
-                - any keywords
+        case 1:
+        ------
+        - 'All regions'
+        - empty text input
+        ------>     returns how-to use SpeakEasy Wine
 
-            always start by presenting results that have exact matches,
-            then present results from Doc2vec
+        case 2:
+        ------
+        - 'Some Region'
+        - empty text input
+        ------>     returns wines in that regions + wines similar to wine from that regions
+                    (top n most similar wines)
+
+        case 3:
+        ------
+        - 'All regions'
+        -  key words
+        ------>     returns exact match for keywords + NLP suggestions
+
+        case 4:
+        ------
+        - 'Some Region'
+        -  key words
+        ------>     returns exact matches + average docvec for the region with added keywordss
+
     """
     kids = []
     if input_value=="":
@@ -124,7 +158,7 @@ def display(input_value):
                     [html.Tr([html.Th(col) for col in DISP_COLUMNS])] +
                     [html.Tr([
                         html.Td(wl.df[wl.df.index==idx][col]) for col in DF_COLUMNS
-                    ]) for idx in exact_indexes[:5]]
+                    ]) for idx in exact_indexes[:n_exact_max]]
                     ),
             ]
         else:
@@ -140,7 +174,7 @@ def display(input_value):
                 html.Div(
                     style={ 'color': 'rgb(185, 25, 25)'},
                     children = [
-                    html.H3 (style={'margin-top': '1%'},children="Our Machine Learnig algorithm found other wines you might like"),
+                    html.H3 (style={'margin-top': '1%'},children="Our Machine Learning algorithm found other wines you might like"),
                     html.Table(
                         [html.Tr([html.Th(col) for col in DISP_COLUMNS])] +
                         [html.Tr([
