@@ -24,14 +24,21 @@ wl = WineList(file='cleaned')
 wl.get_tagged_data()#file_name = "tagged_data_set_regions_varieties_removed.pkl") #"")  #
 # import (or retrain) the Doc2Vec model
 wl.get_doc2vec_model()#from_file="doc2vec_regions_varieties_removed.model") #  f"doc2vec_regions_varieties_removed.model")
+wl.get_mean_region_vect_dict()
+
+
 n_exact_max = 5
 n_disp_max = 30
+n_region_direct = 5
+n_region_nlp = 10
 
-with open ("mean_region_docvecs_dict.pkl", 'rb') as fp:
-    MEAN_VECT_DICT =  pickle.load(fp)
 
-REGION_OPTIONS = [{'label': 'All Regions', 'value': 'All Regions'}]
-REGION_OPTIONS.extend([{'label': x, 'value': x} for x in MEAN_VECT_DICT.keys()])
+DEFAULT_INPUT = ""
+DEFAULT_REGION = 'All Regions'
+REGION_OPTIONS = [{'label': DEFAULT_REGION, 'value': DEFAULT_REGION}]
+REGION_OPTIONS.extend([{'label': x, 'value': x} for x in wl.mean_vects_dict.keys()])
+nlp_style = { 'color': 'rgb(185, 25, 25)'}
+default_style = { 'color': 'rgb(90, 90, 90)'}
 
 external_css = [
         "//fonts.googleapis.com/css?family=Pacifico:400,300,600",
@@ -48,7 +55,23 @@ def get_exact_match_str(n, n_exact_max):
         return "We found 1 exact match"
     else:
         return "We found {} exact matches. Here are {} of them".format(n,n_exact_max)
-# app.config['suppress_callback_exceptions']=True
+
+
+def get_table(header_str,indexes,n_out=15,style=default_style):
+    table_out = [html.Div(
+                    style=style,
+                    children = [
+                        html.H3 (style={'margin-top': '1%'},children=header_str),
+                        html.Table(
+                            [html.Tr([html.Th(col) for col in DISP_COLUMNS])] +
+                            [html.Tr([
+                                html.Td(wl.df[wl.df.index==idx][col]) for col in DF_COLUMNS
+                                ]) for idx in indexes[:n_out]]
+                            )
+                        ]
+                    )
+                ]
+    return table_out
 
 for css in external_css:
     app.css.append_css({"external_url": css})
@@ -61,7 +84,7 @@ app.layout = html.Div(children=[
                                 dcc.Dropdown(
                                     id='region-dropdown',
                                     options=REGION_OPTIONS,
-                                    value="All Regions",
+                                    value=DEFAULT_REGION,
                                     style={
                                         # 'display': 'inline-block',
                                         'width': '65%',
@@ -71,7 +94,7 @@ app.layout = html.Div(children=[
                                 dcc.Input(
                                         placeholder="Describe the wine you are looking for. Example: 'fresh everyday dry wine with notes of citrus'",
                                         id='wine-search-bar',
-                                        value='',
+                                        value=DEFAULT_INPUT,
                                         type='text',
                                         style={
                                             'width': '100%',
@@ -91,12 +114,6 @@ app.layout = html.Div(children=[
                 html.Div(id='results'),
                 ]
             )
-#
-# @app.callback(
-#     dash.dependencies.Output('slider-output-container', 'children'),
-#     [dash.dependencies.Input('price-range-slider', 'value')])
-# def update_output(value):
-#     return 'Price range: $ {} - {}'.format(value[0],value[1])
 
 @app.callback(
     Output(component_id='results', component_property='children'),
@@ -133,15 +150,50 @@ def display(input_value,region_name):
         ------>     returns exact matches + average docvec for the region with added keywordss
 
     """
+
+
     kids = []
-    if input_value=="":
-        kids.extend([html.P("Describe the wine you are looking for")])
-    else:
-        desc = wl.tokenize(input_value,vocab=list(wl.model.wv.vocab.keys()))
-        print(" - ".join(desc))
+    desc = wl.tokenize(input_value,vocab=list(wl.model.wv.vocab.keys()))
+    desc_cond = len(desc)>0
+    region_cond = not (region_name==DEFAULT_REGION or region_name==None)
+    if not desc and not region_cond:
+        kids.extend([html.P("This how SpeakEasy Wine works...")])
+    elif not desc and region_cond:
+        # direct regions:       get_direct_region_wines
+        all_regional_indexes = wl.df[wl.df.region_1==region_name].index
+        regional_indexes, _ = wl.get_doc2vec_region_wines(
+                        region_name,
+                        include_indexes=all_regional_indexes,
+                        topn=500,
+                        method='mean',
+                        desc=None)
+        print(len(regional_indexes))
+        direct_region_table = get_table(
+                    "Here are typical wines from the region '{}'".format(region_name),
+                        regional_indexes,n_out=n_region_direct
+                    )
+        kids.extend(direct_region_table)
+        # doc2vec regions:
+        doc2vec_regional_indexes, _ = wl.get_doc2vec_region_wines(
+                        region_name,
+                        exclude_indexes=all_regional_indexes,
+                        topn=10,
+                        method='mean',
+                        desc=None)
+        doc2vec_region_table = get_table(
+                    "We also found wines from different regions that taste similar.",
+                    doc2vec_regional_indexes,
+                    n_out=n_region_nlp,
+                    style=nlp_style,
+                )
+        kids.extend(doc2vec_region_table)
+    elif desc and region_cond:
+        # direct regions:       get_direct_region_wines(region_name,desc)
+        kids.extend([html.P("Do some fancy computation with wines from {} and keywords: {}".format(region_name," - ".join(desc)))])
+    elif desc and not region_cond:
         exact_indexes = wl.get_exact_match_from_description(desc)
         kids.extend([html.Div(
-            style={ 'color': 'rgb(185, 25, 25)'},
+            style=nlp_style,
             children = [
                     html.P(
                             style={'margin-top': '1%'},
@@ -155,16 +207,7 @@ def display(input_value,region_name):
         docs2vec_final_indexes = [idx for idx in docs2vec_indexes if idx not in exact_indexes]
         exact_match_str = get_exact_match_str(len(exact_indexes),n_exact_max)
         if len(exact_indexes)>0:
-            exact_match_kid =[
-                html.H3(exact_match_str),
-                # Header Table
-                html.Table(
-                    [html.Tr([html.Th(col) for col in DISP_COLUMNS])] +
-                    [html.Tr([
-                        html.Td(wl.df[wl.df.index==idx][col]) for col in DF_COLUMNS
-                    ]) for idx in exact_indexes[:n_exact_max]]
-                    ),
-            ]
+            exact_match_kid = get_table(exact_match_str,exact_indexes,n_out=5)
         else:
             exact_match_kid = [
                 html.P(
@@ -174,25 +217,21 @@ def display(input_value,region_name):
             ]
         kids.extend(exact_match_kid)
         # some text to tell user this is NLP
+        nlp_table = get_table(
+                "Our Machine Learning algorithm found other wines you might like",
+                docs2vec_final_indexes,
+                n_out=15)
         doc2vec_kid = [
                 html.Div(
-                    style={ 'color': 'rgb(185, 25, 25)'},
-                    children = [
-                    html.H3 (style={'margin-top': '1%'},children="Our Machine Learning algorithm found other wines you might like"),
-                    html.Table(
-                        [html.Tr([html.Th(col) for col in DISP_COLUMNS])] +
-                        [html.Tr([
-                            html.Td(wl.df[wl.df.index==idx][col]) for col in DF_COLUMNS
-                        ]) for idx in docs2vec_final_indexes[:15]]
-                    ),
-                    ]
+                    style=nlp_style,
+                    children = nlp_table
                 )
             ]
         kids.extend(doc2vec_kid)
 
-        return html.Div(
-            children=kids
-            )
+    return html.Div(
+        children=kids
+        )
 
 if __name__ == '__main__':
     app.run_server(host='0.0.0.0', debug=True)

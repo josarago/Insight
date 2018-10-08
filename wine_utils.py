@@ -15,12 +15,17 @@ from nltk.tokenize import RegexpTokenizer
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from IPython.display import display, clear_output
 from scipy.spatial.distance import cosine
+from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
+
+from scipy.stats import gaussian_kde
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 SPLIT_COLUMNS = ['aroma','flavour','rind','texture','type','ingredients']
 
 DF_COLUMNS = ['title','description','variety','region_1','country','price','points']
 
+# Seems like 0.9999 is a VERY conservative threshold (see Jupyter Notebook)
+COSINE_SIMILARITY_THRESHOLD = 0.9999
 
 class StopWords:
     def __init__(
@@ -32,6 +37,7 @@ class StopWords:
         if file_path:
             with open (file_path, 'rb') as fp:
                 self.set = pickle.load(fp)
+            fp.close()
         else:
             self.set = set()
         self.category = category
@@ -47,6 +53,7 @@ class StopWords:
     def load(file_path):
         with open (file_path, 'rb') as fp:
             self.set = pickle.load(fp)
+        fp.close()
 
     def get_date_suffix(self):
         return datetime.datetime.now().strftime('%b_%d_%Y_%H-%M')
@@ -84,6 +91,7 @@ class WineList:
                 self.descriptors.append(line.lower().strip('\n'))
         self.tagged_data = None
         self.tagged_data_set = None
+        self.mean_vects_dict = None
 
     def clean_df(self,remove_outliers_percent=4,wine_csv_file='winemag_cleaned.csv'):
         """
@@ -137,6 +145,7 @@ class WineList:
             with open (file_name, 'rb') as fp:
                 print("loading stop words from {}".format(file_name))
                 extra_stop = pickle.load(fp)
+            fp.close()
         self.stop_words.set.update(extra_stop)
         if save:
             self.stop_words.save(overwrite=False)
@@ -207,10 +216,59 @@ class WineList:
         test_df = df[~msk]
         return train_df, test_df
 
-    # def get_column_cnt(self,column_name):
-    #     if self.column_cnt[column_name]==None:
-    #         self.column_cnt[column_name] = {key:{len(self.df[self.df[column_name]==key])} for key in list(set(self.df[column_name]))}
-    #         self.column_cnt.pop(np.nan, None)
+    def get_mean_region_vect_dict(self,n_min=50,recompute=False):
+        self.top_regions_list = self.get_top_keys('region_1',n_min=n_min)
+        if os.path.exists("mean_region_docvecs_dict.pkl") and not recompute:
+            with open ("mean_region_docvecs_dict.pkl", 'rb') as fp:
+                self.mean_vects_dict =  pickle.load(fp)
+            fp.close()
+        else:
+            # initialize a dictionary to store the mean vector for each region
+            self.mean_vects_dict = dict.fromkeys([x['name'] for x in self.top_regions_list],np.zeros(self.model.vector_size))
+            # for every region in the list
+            for region in self.top_regions_list:
+                # get the rows for wines of that region
+                region_df = self.df[self.df.region_1==region['name']]
+                # shuffle the filtered DataFrame wines
+                region_df = region_df.sample(frac=1)
+                # initialize a counter
+                cnt=0
+                # and a "previous vector"
+                prev_vec = np.ones(self.model.vector_size).reshape(1, -1)
+                keepgoing = True
+
+                for row in region_df.itertuples():
+                    if keepgoing:
+                        cnt+=1
+                        # infer the feature vector
+                        new_vec = self.model.infer_vector(self.tokenize(row.description)).reshape(1, -1)
+                        # update the mean vector
+                        self.mean_vects_dict[region['name']] = ((cnt-1)*self.mean_vects_dict[region['name']]+new_vec)/cnt
+                        # update the previous vector
+                        prev_vec = self.mean_vects_dict[region['name']].copy()
+                        # test if we reached the threshold for the convergence of the mean vector
+                        keepgoing = cosine_similarity(prev_vec,self.mean_vects_dict[region['name']])<COSINE_SIMILARITY_THRESHOLD
+                    else:
+                        break
+
+    def get_kde_argmax(self,n_min=50):
+        self.top_regions_list = self.get_top_keys('region_1',n_min=n_min)
+        # initialize a dictionary to store the mean vector for each region
+        self.kde_argmax_vects_dict = dict.fromkeys([x['name'] for x in self.top_regions_list],np.zeros(self.model.vector_size))
+        # for every region in the list
+        for region in self.top_regions_list:
+            # get the rows for wines of that region
+            region_df = self.df[self.df.region_1==region['name']]
+            # shuffle the filtered DataFrame wines
+            region_df = region_df.sample(n=n_min)
+            region_mat = []
+            for wine in region_df.itertuples():
+                desc = self.tokenize(wine.description)
+                region_mat.append(self.model.infer_vector(desc))
+            region_mat = np.transpose(np.vstack(region_mat))
+            kernel = gaussian_kde(region_mat)
+            self.kde_argmax_vects_dict[region['name']] = region_mat.T[np.argmax(kernel)]
+
 
     def get_column_cnt_list(self,column_name):
         cnt = -1
@@ -294,8 +352,8 @@ class WineList:
         # lowered_column_str = [x.lower() for x in set(self.df[column_name])]
         return any([token in this_column_str.lower() for this_column_str in set(self.df[column_name])])
 
-    def is_in_vocab(self,token,model):
-        return token.lower() in model.wv.vocab
+    def is_in_vocab(self,token):
+        return token.lower() in self.model.wv.vocab
 
     def get_matched_columns(self,token,column_list):
         """
@@ -306,7 +364,7 @@ class WineList:
         [columns_matched.add(column_name) for column_name in column_list if self.is_in_column(token,column_name)]
         return columns_matched
 
-    def get_match_dict(self,input_str,model):
+    def get_match_dict(self,input_str):
         lookup_columns = 'variety','region_1'
         desc = self.tokenize(input_str)
         match_dict = {
@@ -316,9 +374,29 @@ class WineList:
             }
         for token in desc:
             [match_dict[column_name].append(token) for column_name in lookup_columns if self.is_in_column(token,column_name)]
-            if self.is_in_vocab(token,model):
+            if self.is_in_vocab(token,self.model):
                 match_dict['description'].append(token)
         return match_dict, desc
+
+    def get_regional_archetype(self,region_name,topn=30,method='mean'):
+        """
+            a function to display the wine from a region most similar to the average feature vector of that region
+        """
+        if method=='mean':
+            archetype_vect = np.array(self.mean_vects_dict[region_name])
+        elif method=='kde_mode':
+            archetype_vect = np.array([self.kde_argmax_vects_dict[region_name]])
+        # find the most similar docsvec for its mean vector
+        similar_docs = self.model.docvecs.most_similar(archetype_vect,topn=topn)
+        keepgoing = True
+        indx = -1
+        return_str = None
+        while keepgoing:
+            indx+=1
+            if self.df.loc[similar_docs[indx][0]].region_1==region_name:
+                keepgoing=False
+                archetype_vect_wine = self.df.loc[similar_docs[indx][0]]
+        return archetype_vect_wine
 
     def get_description_match_series_from_sets(self,desc):
         set_desc = set(desc)
@@ -331,6 +409,47 @@ class WineList:
         indexes = [index for _, (index, this_desc) in enumerate(self.tagged_data_set.items()) if set_desc.issubset(this_desc)]
         return indexes
 
+    def get_direct_region_wines(self,region_name,desc=None):
+        """
+            return indexes of wines from region 'region_name' and, if provided
+            wines from region region_name with tokens from desc
+        """
+        region_indexes = self.df[self.df.region_1==region_name].index
+        if desc:
+            desc_indexes = self.get_exact_match_from_description(desc)
+            region_indexes = list(set(region_indexes) & set(desc_indexes))
+        return region_indexes
+
+    def get_doc2vec_region_wines(
+                self,
+                region_name,
+                include_indexes=[],
+                exclude_indexes=[],
+                topn=5,
+                method='mean',
+                desc=None,
+                weight=.33
+            ):
+        """
+            this function finds the topn most similar wines to the average wine from region_name
+            and if a desc if provided, the most ssimilar
+        """
+        if region_name in [x['name'] for x in self.top_regions_list]:
+            if method=='mean':
+                wine_vect = self.mean_vects_dict[region_name].copy()
+            elif method=='kde_mode':
+                wine_vect = self.kde_argmax_vects_dict[region_name].copy()
+            if desc:
+                for token in desc:
+                    wine_vect+= self.model[token]*weight
+            similar_docs = self.model.docvecs.most_similar(wine_vect,topn=topn)
+            indexes = [x[0] for x in similar_docs]
+            if  len(exclude_indexes)>0:
+                indexes = [x for x in indexes if x not in exclude_indexes]
+            if len(include_indexes)>0:
+                indexes = [x for x in indexes if x in include_indexes]
+            return indexes, wine_vect
+        return [], None
 
     def get_date_suffix(self):
         return datetime.datetime.now().strftime('%b_%d_%Y_%H-%M')
