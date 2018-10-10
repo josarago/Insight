@@ -61,7 +61,7 @@ def get_table(header_str,indexes,n_out=15,style=default_style):
     table_out = [html.Div(
                     style=style,
                     children = [
-                        html.H3 (style={'margin-top': '1%'},children=header_str),
+                        html.H2 (style={'margin-top': '1%'},children=header_str),
                         html.Table(
                             [html.Tr([html.Th(col) for col in DISP_COLUMNS])] +
                             [html.Tr([
@@ -155,21 +155,22 @@ def display(input_value,region_name):
     kids = []
     desc = wl.tokenize(input_value,vocab=list(wl.model.wv.vocab.keys()))
     desc_cond = len(desc)>0
+    joined_kw = " - ".join(desc)
     region_cond = not (region_name==DEFAULT_REGION or region_name==None)
     if not desc and not region_cond:
         kids.extend([html.P("This how SpeakEasy Wine works...")])
     elif not desc and region_cond:
-        # direct regions:       get_direct_region_wines
+        # direct regions
         all_regional_indexes = wl.df[wl.df.region_1==region_name].index
         regional_indexes, _ = wl.get_doc2vec_region_wines(
-                        region_name,
-                        include_indexes=all_regional_indexes,
-                        topn=500,
-                        method='mean',
-                        desc=None)
-        print(len(regional_indexes))
+                                                        region_name,
+                                                        include_indexes=all_regional_indexes,
+                                                        topn=500,
+                                                        method='mean',
+                                                        desc=None
+                                                    )
         direct_region_table = get_table(
-                    "Here are typical wines from the region '{}'".format(region_name),
+                    "Here are typical wines from the region '{}'.".format(region_name),
                         regional_indexes,n_out=n_region_direct
                     )
         kids.extend(direct_region_table)
@@ -188,8 +189,41 @@ def display(input_value,region_name):
                 )
         kids.extend(doc2vec_region_table)
     elif desc and region_cond:
-        # direct regions:       get_direct_region_wines(region_name,desc)
-        kids.extend([html.P("Do some fancy computation with wines from {} and keywords: {}".format(region_name," - ".join(desc)))])
+        # direct regions:
+        regional_with_kw = wl.get_direct_region_wines(region_name,desc)
+        if len(regional_with_kw)>0:
+            with_kw_table = get_table(
+                    "Here are wines from the region '{}' matching the keywords '{}'.".format(
+                                                                region_name,
+                                                                joined_kw
+                                                                ),
+                    regional_with_kw,
+                    n_out=n_region_direct
+                )
+            kids.extend(with_kw_table)
+        else:
+            sorry_message = "We didn't find any wine from the region '{}' matching the keyword(s) '{}', sorry.".format(
+                                                            region_name,
+                                                            joined_kw
+                                                            ),
+            kids.extend([html.H3(children=sorry_message)])
+        all_regional_indexes = wl.df[wl.df.region_1==region_name].index
+        doc2vec_regional_with_kw, _ = wl.get_doc2vec_region_wines(
+                    region_name,
+                    desc=desc,
+                    exclude_indexes=all_regional_indexes,
+                    weight=.6,
+                    topn=500,
+                    )
+        # print(doc2vec_regional_with_kw)
+        doc2vec_region_kw_msg = "We found wines that have characteristics of '{}' and '{}'.".format(region_name,joined_kw)
+        doc2vec_region_kw_table = get_table(
+                        doc2vec_region_kw_msg,
+                        doc2vec_regional_with_kw,
+                        n_out=n_region_direct,
+                        style=nlp_style,
+                    )
+        kids.extend(doc2vec_region_kw_table)
     elif desc and not region_cond:
         exact_indexes = wl.get_exact_match_from_description(desc)
         kids.extend([html.Div(
@@ -199,7 +233,7 @@ def display(input_value,region_name):
                             style={'margin-top': '1%'},
                             children="Using the key words:"
                         ),
-                    html.H4(" - ".join(desc)),
+                    html.H4(children=joined_kw),
                 ]
             )
         ])
