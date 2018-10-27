@@ -140,7 +140,7 @@ def display(input_value):
                 html.Div(
                     style={ 'color': 'rgb(185, 25, 25)'},
                     children = [
-                    html.H3 (style={'margin-top': '1%'},children="Our Machine Learnig algorithm found other wines you might like"),
+                    html.H3 (style={'margin-top': '1%'},children="Our Machine Learning algorithm found other wines you might like"),
                     html.Table(
                         [html.Tr([html.Th(col) for col in DISP_COLUMNS])] +
                         [html.Tr([
