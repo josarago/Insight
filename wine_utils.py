@@ -15,9 +15,9 @@ from nltk.tokenize import RegexpTokenizer
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from IPython.display import display, clear_output
 from scipy.spatial.distance import cosine
-from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
-
 from scipy.stats import gaussian_kde
+
+from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 SPLIT_COLUMNS = ['aroma','flavour','rind','texture','type','ingredients']
