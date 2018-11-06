@@ -158,7 +158,9 @@ def display(input_value,region_name):
     joined_kw = " - ".join(desc)
     region_cond = not (region_name==DEFAULT_REGION or region_name==None)
     if not desc and not region_cond:
-        kids.extend([html.P("This how SpeakEasy Wine works...")])
+        kids.extend([
+            html.P("Welcome to SpeakEasy Wine! Choose your favorite wine region, or things you would like to find in a wine. Or both!")
+            ])
     elif not desc and region_cond:
         # direct regions
         all_regional_indexes = wl.df[wl.df.region_1==region_name].index
@@ -216,7 +218,7 @@ def display(input_value,region_name):
                     topn=500,
                     )
         # print(doc2vec_regional_with_kw)
-        doc2vec_region_kw_msg = "We found wines that have characteristics of '{}' and '{}'.".format(region_name,joined_kw)
+        doc2vec_region_kw_msg = "Here are wines that retain the main characteristics of the region '{}' but are also '{}'.".format(region_name,joined_kw)
         doc2vec_region_kw_table = get_table(
                         doc2vec_region_kw_msg,
                         doc2vec_regional_with_kw,
