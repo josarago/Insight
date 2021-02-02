@@ -2,7 +2,7 @@ appnope==0.1.0
 backports.csv==1.0.6
 backports.functools-lru-cache==1.5
 beautifulsoup4==4.6.3
-bleach==1.5.0
+bleach==3.3.0
 boto==2.49.0
 boto3==1.9.9
 botocore==1.12.9
